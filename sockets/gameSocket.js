@@ -501,6 +501,7 @@ async function startRound(io, room) {
   
   // Sync the local tracker
   roomDrawers[room.roomId] = drawer.socketId;
+  
 
   const shuffled = [...words].sort(() => 0.5 - Math.random());
   const wordChoices = shuffled.slice(0, 3);
