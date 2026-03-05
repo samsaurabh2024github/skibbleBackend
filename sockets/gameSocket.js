@@ -285,59 +285,106 @@ module.exports = (io) => {
     });
 
 
-    // START GAME
-   socket.on("start_game", async ({ roomId }) => {
+//     // START GAME
+//    socket.on("start_game", async ({ roomId }) => {
 
-  const room = await Room.findOne({ roomId });
-  if (!room) return;
+//   const room = await Room.findOne({ roomId });
+//   if (!room) return;
 
-  room.currentRound = 1;
-  room.currentDrawerIndex = 0;
+//   room.currentRound = 1;
+//   room.currentDrawerIndex = 0;
 
-  await room.save();
+//   await room.save();
 
-  io.to(roomId).emit("game_started"); // ⭐ ADD THIS
+//   io.to(roomId).emit("game_started"); // ⭐ ADD THIS
 
-  startRound(io, room);
+//   startRound(io, room);
 
-});
+// });
 
-    // WORD CHOSEN
+//     // WORD CHOSEN
+//     socket.on("word_chosen", async ({ roomId, word }) => {
+
+//       const room = await Room.findOne({ roomId });
+//       if (!room) return;
+
+//       room.currentWord = word;
+//       await room.save();
+
+//       const drawerId = roomDrawers[roomId];
+
+//       let timeLeft = room.settings.drawTime || 60;
+
+//       io.to(roomId).emit("round_start", {
+//         drawerId,
+//         timeLeft
+//       });
+
+//       const timer = setInterval(() => {
+
+//         timeLeft--;
+
+//         io.to(roomId).emit("timer_update", { timeLeft });
+
+//         if (timeLeft <= 0) {
+
+//           clearInterval(timer);
+
+//           endRound(io, room);
+
+//         }
+
+//       }, 1000);
+
+//     });
+
+
+socket.on("start_game", async ({ roomId }) => {
+      const room = await Room.findOne({ roomId });
+      if (!room) return;
+
+      room.currentRound = 1;
+      room.currentDrawerIndex = 0;
+      // Mark game as started in DB if you have that field
+      room.gameStarted = true; 
+      await room.save();
+
+      io.to(roomId).emit("game_started");
+      
+      // Start the round logic immediately
+      startRound(io, room);
+    });
+
     socket.on("word_chosen", async ({ roomId, word }) => {
-
       const room = await Room.findOne({ roomId });
       if (!room) return;
 
       room.currentWord = word;
       await room.save();
 
-      const drawerId = roomDrawers[roomId];
+      // IMPORTANT: Get the drawerId directly from the room logic 
+      // instead of relying solely on the roomDrawers variable
+      const drawer = room.players[room.currentDrawerIndex];
+      const drawerId = drawer.socketId;
 
       let timeLeft = room.settings.drawTime || 60;
 
+      // Tell everyone the round has officially started with the timer
       io.to(roomId).emit("round_start", {
         drawerId,
         timeLeft
       });
 
       const timer = setInterval(() => {
-
         timeLeft--;
-
         io.to(roomId).emit("timer_update", { timeLeft });
 
         if (timeLeft <= 0) {
-
           clearInterval(timer);
-
           endRound(io, room);
-
         }
-
       }, 1000);
-
     });
-
 
     // DRAW
     socket.on("draw_move", ({ roomId, data }) => {
@@ -433,20 +480,36 @@ module.exports = (io) => {
 
 
 
+// async function startRound(io, room) {
+
+//   const drawer = room.players[room.currentDrawerIndex];
+
+//   roomDrawers[room.roomId] = drawer.socketId;
+
+//   const shuffled = [...words].sort(() => 0.5 - Math.random());
+//   const wordChoices = shuffled.slice(0,3);
+
+//   io.to(drawer.socketId).emit("choose_word", {
+//     words: wordChoices,
+//     drawerId: drawer.socketId
+//   });
+
+// }
+
 async function startRound(io, room) {
-
   const drawer = room.players[room.currentDrawerIndex];
-
+  
+  // Sync the local tracker
   roomDrawers[room.roomId] = drawer.socketId;
 
   const shuffled = [...words].sort(() => 0.5 - Math.random());
-  const wordChoices = shuffled.slice(0,3);
+  const wordChoices = shuffled.slice(0, 3);
 
+  // Send word choices ONLY to the drawer
   io.to(drawer.socketId).emit("choose_word", {
     words: wordChoices,
     drawerId: drawer.socketId
   });
-
 }
 
 
