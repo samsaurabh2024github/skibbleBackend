@@ -496,17 +496,38 @@ socket.on("start_game", async ({ roomId }) => {
 
 // }
 
+// async function startRound(io, room) {
+//   const drawer = room.players[room.currentDrawerIndex];
+  
+//   // Sync the local tracker
+//   roomDrawers[room.roomId] = drawer.socketId;
+  
+
+//   const shuffled = [...words].sort(() => 0.5 - Math.random());
+//   const wordChoices = shuffled.slice(0, 3);
+
+//   // Send word choices ONLY to the drawer
+//   io.to(drawer.socketId).emit("choose_word", {
+//     words: wordChoices,
+//     drawerId: drawer.socketId
+//   });
+// }
+
 async function startRound(io, room) {
   const drawer = room.players[room.currentDrawerIndex];
   
-  // Sync the local tracker
+  // Sync the local tracker so the server knows who can draw
   roomDrawers[room.roomId] = drawer.socketId;
-  
 
   const shuffled = [...words].sort(() => 0.5 - Math.random());
   const wordChoices = shuffled.slice(0, 3);
 
-  // Send word choices ONLY to the drawer
+  // Clear any old word from the previous round
+  room.currentWord = null;
+  await room.save();
+
+  // Send choices ONLY to the drawer. 
+  // DO NOT emit anything to the whole room (io.to(roomId)) here!
   io.to(drawer.socketId).emit("choose_word", {
     words: wordChoices,
     drawerId: drawer.socketId
